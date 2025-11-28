@@ -20,20 +20,7 @@ _ALLOWED_OPS = {
 }
 
 def safe_eval(expr: str, last_result=None):
-    """
-    Safely evaluate a math expression using the ast module.
-    Supports:
-      - numeric literals (int, float)
-      - binary ops: + - * / % ** //
-      - unary + and -
-      - parentheses
-      - the name 'ans' which resolves to last_result (must be numeric)
-    Disallowed:
-      - function calls
-      - attribute access
-      - names other than 'ans'
-    Raises ValueError on disallowed constructs or other parse issues.
-    """
+
     if expr is None:
         raise ValueError("No expression provided")
 
@@ -47,8 +34,9 @@ def safe_eval(expr: str, last_result=None):
             node = ast.parse(expr, mode="eval")
     except SyntaxError as e:
             raise ValueError(f"Syntax error: {e}")
+    return _eval(node, last_result=last_result)
+def _eval(node, last_result=None):
 
-def _eval(node):
     if isinstance(node, ast.Expression):
         return _eval(node.body)
 
@@ -70,10 +58,8 @@ def _eval(node):
     if isinstance(node, ast.Constant):
         if isinstance(node.value, (int, float)):
             return node.value
-            raise ValueError("Only numeric constants are allowed")
+        raise ValueError("Only numeric constants are allowed")
 
-    if isinstance(node, ast.Num):
-         return node.n    
 
     if isinstance(node, ast.Name):
             if node.id == "ans":
@@ -82,9 +68,7 @@ def _eval(node):
                 return last_result
             raise ValueError(f"Use of name '{node.id}' is not allowed")
     
-            raise ValueError(f"Unsupported expression element: {type(node)}")
-
-    return _eval(node.body if isinstance(node, ast.Expression) else node)
+    raise ValueError(f"Unsupported expression element: {type(node)}")
 
 class Calculator:
     def __init__(self):
@@ -119,7 +103,7 @@ class Calculator:
         try:
             result = a ** b
             
-            if isinstance(result, int) and abs(result) > 10**100:
+            if abs(result) > 10**100:
                 return None, f"{a} ** {b} = too large"
             return self._store_and_format(result, f"{a} ** {b} = {result}")
         except OverflowError:
@@ -147,6 +131,8 @@ class Calculator:
             n = int(a)
             if n < 0:
                 return None, "Factorial not defined for negative numbers"
+            if n > 5000:
+                return None, f"Factorial too large: {n}! (max: 5000)"
             result = math.factorial(n)
             return self._store_and_format(result, f"{n}! = {result}")
         except Exception as e:
@@ -188,12 +174,12 @@ class HistoryManager:
         except Exception as e:
             print(f"Warning: failed to save history: {e}")
 
-def clear_history(self):
-        try:
-            with open(self.filename, "w") as f:
-                json.dump([], f)
-        except Exception as e:
-            print(f"Warning: failed to clear history: {e}")
+    def clear_history(self):
+            try:
+                with open(self.filename, "w") as f:
+                    json.dump([], f)
+            except Exception as e:
+                print(f"Warning: failed to clear history: {e}")
 
 def get_expression_input(prompt, last_result):
      while True:
@@ -208,19 +194,11 @@ def get_expression_input(prompt, last_result):
             return last_result
         
         try:
-            if "." in s:
-                return float(s)
-            return int(s)
-        except ValueError:
-            pass
-        
-        try:
             val = safe_eval(s, last_result=last_result)
-        
-            return float(val) if isinstance(val, float) else int(val) if isinstance(val, int) else float(val)
+            return val    
         except Exception as e:
             print(f"Invalid expression: {e}. Enter a number, expression, 'ans', or 'q'.")
-
+        
 def show_menu(autosave_enabled):
     print("\n--- Main Menu ---")
     print("1. Addition (a + b)")
@@ -295,6 +273,7 @@ def main():
             message = f"Expression = {val}"
             print("Result:", message)
             history.append(message)
+            calc.last_result = val 
             if autosave:
                 history_manager.save_history(history)
             continue
